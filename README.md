@@ -49,7 +49,7 @@
 | Blender · 邮轮照片复刻 | 同上 | 4 张 AI 生成的同一艘船多视角照片 → 参数化建模 → 同机位渲染；8 轮迭代，每轮 5～30 秒预览 |
 | 豆包工作 · 过程截图 | L0：内嵌 Chromium 的 CDP | 连做 8 张过程截图 + 挂技能 + 填链接 + 切执行环境，**一次焦点都没借** |
 
-<p align="center"><img src="assets/case-cruise-compare.jpg" width="100%"><br><sub>邮轮案例：上排是 AI 生成的照片，下排是 agent 在 Blender 里建模并同机位渲出来的</sub></p>
+<p align="center"><img src="assets/case-cruise-compare.jpg" width="100%"><br><sub>邮轮案例：左边是 AI 生成的照片，右边是 agent 在 Blender 里建模并同机位渲出来的</sub></p>
 
 <p align="center"><img src="assets/hero-donut.gif" width="100%"><br><sub>甜甜圈案例：面团气孔与油炸腰线、只淋上半截的波浪淋面与垂滴、三百颗贴面糖针，10 秒运镜</sub></p>
 
