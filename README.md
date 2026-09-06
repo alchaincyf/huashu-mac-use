@@ -3,9 +3,9 @@
 # huashu-mac-use
 
 <p align="center">
-  <img src="assets/hero-donut.gif" alt="Claude Code 用 huashu-mac-use 操控 Blender 做出的巧克力甜甜圈，10 秒运镜" width="100%">
+  <img src="assets/hero-cruise.gif" alt="Claude Code 用 huashu-mac-use 操控 Blender 照着 4 张照片复刻的十万吨级邮轮，10 秒环绕" width="100%">
   <br/>
-  <sub>▲ 一个 coding agent 操控 Blender 做出来的巧克力甜甜圈。建模、材质、灯光、渲染、运镜全程没有人碰鼠标。</sub>
+  <sub>▲ 一个 coding agent 照着 4 张 AI 生成的照片，在 Blender 里建出来的十万吨级邮轮。建模、材质、灯光、渲染、运镜全程没有人碰鼠标，33 分钟。</sub>
 </p>
 
 > *「读随便读，写不打扰，每一步都留证据。」*
@@ -50,6 +50,8 @@
 | 豆包工作 · 过程截图 | L0：内嵌 Chromium 的 CDP | 连做 8 张过程截图 + 挂技能 + 填链接 + 切执行环境，**一次焦点都没借** |
 
 <p align="center"><img src="assets/case-cruise-compare.jpg" width="100%"><br><sub>邮轮案例：上排是 AI 生成的照片，下排是 agent 在 Blender 里建模并同机位渲出来的</sub></p>
+
+<p align="center"><img src="assets/hero-donut.gif" width="100%"><br><sub>甜甜圈案例：面团气孔与油炸腰线、只淋上半截的波浪淋面与垂滴、三百颗贴面糖针，10 秒运镜</sub></p>
 
 <p align="center"><img src="assets/case-blender-gui.jpg" width="100%"><br><sub>甜甜圈场景在 Blender GUI 里的样子。这张图是 skill 自己在后台截的窗口，用户当时在另一个桌面打字，没有任何感觉</sub></p>
 

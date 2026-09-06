@@ -1,94 +1,35 @@
-<!doctype html>
-<html lang="zh">
-<head>
-<meta charset="utf-8">
-<title>huashu-mac-use 工作原理</title>
-<style>
-  :root{ --ink:#1f1a17; --muted:#6b625c; --line:#d9d2cb; --paper:#faf7f2; --card:#ffffff; --accent:#d9633a; --accent2:#2d6a4f; --accent3:#3a5a8c; --soft:#f3ece4; }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--paper);font-family:-apple-system,"PingFang SC","Hiragino Sans GB","Noto Sans CJK SC",sans-serif;color:var(--ink);width:1600px;height:820px;overflow:hidden}
-  .wrap{padding:34px 44px 30px;height:100%;display:flex;flex-direction:column;gap:18px}
-  h1{margin:0;font-size:30px;font-weight:700;letter-spacing:.5px}
-  h1 small{font-size:16px;color:var(--muted);font-weight:400;margin-left:14px}
-  .cols{display:grid;grid-template-columns:1.05fr 1.25fr 1fr;gap:22px;flex:1}
-  .col{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;position:relative}
-  .col h2{margin:0 0 4px;font-size:19px;display:flex;align-items:center;gap:10px}
-  .num{display:inline-flex;width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;font-size:15px;align-items:center;justify-content:center;font-weight:700}
-  .box{border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14.5px;line-height:1.45;background:#fff}
-  .box b{font-weight:700}
-  .box .k{font-family:"SF Mono",Menlo,monospace;font-size:13px;background:var(--soft);padding:1px 6px;border-radius:5px}
-  .box.hi{border-color:var(--accent);background:#fff7f3}
-  .box.g{border-color:var(--accent2);background:#f2f8f4}
-  .box.b{border-color:var(--accent3);background:#f1f5fb}
-  .arrow{color:var(--muted);text-align:center;font-size:16px;line-height:1;margin:-2px 0}
-  .split{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .tag{font-size:12px;color:var(--muted);letter-spacing:.3px}
-  .ladder{display:flex;flex-direction:column;gap:5px}
-  .ladder div{padding:6px 10px;border-radius:8px;font-size:13.5px;background:var(--soft);display:flex;gap:8px;align-items:center}
-  .ladder div span:first-child{font-weight:700;color:var(--muted);width:22px}
-  .ladder .ok{background:#e6f2ea}
-  .ladder .no{color:#8a7a70;text-decoration:line-through}
-  .foot{background:var(--ink);color:#f6efe8;border-radius:12px;padding:12px 20px;font-size:14px;display:flex;gap:22px;align-items:center}
-  .foot b{color:#ffb38a}
-  .loop{position:absolute;right:16px;top:14px;font-size:12px;color:var(--accent);border:1px dashed var(--accent);border-radius:20px;padding:2px 10px}
-  .note{font-size:12.5px;color:var(--muted);line-height:1.4}
-</style>
-</head>
-<body>
-<div class="wrap">
-  <h1>huashu-mac-use 工作原理<small>agent 操控没有 API 的 macOS 原生 app，并留下可复现的取证</small></h1>
-
-  <div class="cols">
-    <!-- 1 选层 -->
-    <div class="col">
-      <h2><span class="num">1</span>先探测，再选层</h2>
-      <div class="box"><b>第 0 步</b> <span class="k">probe.sh &lt;app&gt;</span><br>bundle、架构、URL scheme、AppleScript 字典、本地端口、AX 控件数、版本号</div>
-      <div class="arrow">↓ 按 app 内核分流</div>
-      <div class="split">
-        <div class="box b"><b>内嵌 Chromium</b>（Electron / CEF）<br>→ <b>L0 · CDP</b>：<span class="k">mac open --cdp</span> 起调试端口，<span class="k">cdp.js</span> snapshot / find / insert / mouse<br><span class="tag">零焦点 · 跨 Space · 多 agent 互不干扰</span></div>
-        <div class="box"><b>原生 / 自绘</b><br>→ <b>L0</b> 自带 CLI、字典、URL scheme<br>→ <b>L1 · AX 树</b>（探到可编辑控件且实写后状态变化才算通）<br>→ <b>L2 · 窗口坐标</b>：<span class="k">mac see</span> 看图，图上像素直接给 <span class="k">mac op</span></div>
-      </div>
-      <div class="arrow">↓</div>
-      <div class="box"><b>L3 · 像素</b>：控制手段的最后一档，<b>验证手段的每一步</b>。截图坐标三种写法内核自己换算，agent 永远不做乘法</div>
-      <div class="note">经验：同架构两种结果、同一个 app 两个窗口两种结果——不按架构预测，按窗口试一次</div>
-    </div>
-
-    <!-- 2 读写分离 -->
-    <div class="col">
-      <h2><span class="num">2</span>读完全后台，写默认零焦点</h2>
-      <div class="split">
-        <div class="box g"><b>读</b>：列窗口 / 截窗口 / AX / CDP<br>全部后台，不 activate、不切 Space、不动鼠标。被遮挡的窗口照样截得干净</div>
-        <div class="box hi"><b>写</b>：<span class="k">mac op</span> 走阶梯<br>① postToPid 直投进程（不抢焦点）<br>② 截图差分判生效<br>③ 判不出才升级借焦点</div>
-      </div>
-      <div class="arrow">↓ 升级借焦点前，自动过闸</div>
-      <div class="box"><b>四道闸</b>（<span class="k">--dry</span> 可预演）<br>前台是不是目标 · 落点有没有被别的窗口压住 · <b>用户 2 秒内动过键鼠就等他停手（最多 15 秒）</b> · 全机同时只允许一个进程借焦点</div>
-      <div class="arrow">↓</div>
-      <div class="split">
-        <div class="box"><b>接管时</b>屏幕四角脉冲取景框（HUD）：鼠标穿透、不抢焦点、跨 Space、<b>对截图隐身</b></div>
-        <div class="box"><b>借用约 0.5 秒</b>立刻还焦点、还原鼠标，等待与截图都挪到还完之后，并报出实测秒数</div>
-      </div>
-      <div class="box b" style="margin-top:2px"><b>跨 Space 是默认拓扑</b>：agent 常在全屏终端里，目标 app 在另一个桌面。读随便读；坐标写操作内核直接拒绝（<span class="k">refused: cross-space</span>），改走 CDP 或请用户挪窗口，不自己切 Space</div>
-    </div>
-
-    <!-- 3 验证与进化 -->
-    <div class="col">
-      <span class="loop">↻ 每次收工回流</span>
-      <h2><span class="num">3</span>回读验证，经验进工具</h2>
-      <div class="tag">判据阶梯（从弱到强，前三级都骗过人）</div>
-      <div class="ladder">
-        <div class="no"><span>1</span><span>工具返回 success</span></div>
-        <div class="no"><span>2</span><span>读回控件值</span></div>
-        <div class="no"><span>3</span><span>截图看见字</span></div>
-        <div class="ok"><span>4</span><span><b>应用状态指示器</b>：发送键由灰变亮、placeholder 消失</span></div>
-        <div class="ok"><span>5</span><span><b>副作用</b>：任务进列表、文件落盘、请求发出</span></div>
-      </div>
-      <div class="box">动作后自动差分，回 <span class="k">effect=confirmed | partial | suspected_noop | unverifiable</span>——suspected_noop 不是失败，是「回去重看」</div>
-      <div class="arrow">↓ 学到新东西</div>
-      <div class="box hi"><b>先问：这条教训能不能变成工具行为？</b><br>能 → 改代码（坐标换算、shot 自诊断、AX 查两次、跨 Space 拒绝…都是这么来的）<br>不能 → 只进 references：单 app 观察进 app 档案，两个 app 重现才升正文；坐标、端口、界面文案是易腐信息，永远不进正文</div>
-    </div>
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>huashu-mac-use · 工作流程图</title><style>
+:root{--ivory:#F6F3EC;--navy:#0B2545;--red:#8B2E2E;--ink2:#3E4A5E;--ink3:#7A8494;--hair:rgba(11,37,69,.3);--hair2:rgba(11,37,69,.16);--paper:#FFFFFF;
+--title:"Baskerville","Songti SC","STSong","SimSun","宋体",serif;--body:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;--mono:"Menlo","Monaco","Consolas","Courier New",monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--ivory);color:var(--navy);font-synthesis:none;-webkit-font-smoothing:antialiased;font-family:var(--body)}
+section.page{position:relative;width:1920px;height:1080px;padding:64px 96px 56px;display:flex;flex-direction:column}
+.top{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:16px;border-bottom:1px solid var(--hair)}
+.tracker{font:20px/1 var(--body);letter-spacing:.2em;color:var(--navy)}
+.mark{position:relative;width:192px;height:1px;margin-bottom:6px}.mark i{position:absolute;top:0;left:128px;width:64px;height:1px;background:var(--navy)}
+.foot{border-top:1px solid var(--hair);padding-top:16px;min-height:44px;display:flex;justify-content:space-between;gap:48px;font:20px/1.5 var(--body);color:var(--ink2);margin-top:auto}
+.foot .mono{font-family:var(--mono);font-size:19px;color:var(--ink3)}
+.m-diagram{display:flex;flex-direction:column;padding:22px 0 0 0;min-height:0}
+.m-diagram .head{display:flex;justify-content:space-between;align-items:flex-end;gap:64px;padding-bottom:16px}
+.m-diagram .kicker{font:20px/1 var(--mono);letter-spacing:.2em;color:var(--red)}
+.m-diagram h1{margin-top:14px;font:700 40px/1.25 var(--title);color:var(--navy);white-space:nowrap}
+.m-diagram .sub{max-width:760px;font:22px/1.55 var(--body);color:var(--ink2);text-align:right;padding-bottom:4px}
+.m-diagram svg.sheet{display:block;width:100%;height:auto;overflow:visible}
+.m-diagram .wr{fill:none;stroke:var(--navy);stroke-width:1;stroke-linejoin:miter;stroke-linecap:butt}
+.m-diagram .wr.dsh{stroke-dasharray:7 5}
+.m-diagram .nd{fill:#FFF;stroke:var(--navy);stroke-width:1}
+.m-diagram .nd.dsh{stroke-dasharray:6 4}
+.m-diagram .hm{fill:#FFF;stroke:var(--red);stroke-width:1.5}
+.m-diagram .jn{fill:var(--navy)}
+.m-diagram .hl{stroke:var(--hair);stroke-width:1}
+.m-diagram .rg{fill:none;stroke:var(--hair);stroke-width:1;stroke-dasharray:3 4}
+</style></head>
+<body><section class="page">
+  <div class="top"><div class="tracker">怎么做到的</div><div class="mark"><i></i></div></div>
+  <div class="m-diagram">
+    <div class="head"><div><div class="kicker">huashu-mac-use · 工作流程图</div><h1>读随便读，写要过闸，每一步回读</h1></div>
+    <p class="sub">先探测再选层：有结构接口就零焦点走接口；没有才看图点击，写操作先后台投递，判不出生效才借焦点，借前过闸、半秒还回。收工把教训写进工具</p></div>
+    <svg viewBox="0 0 1728 740" width="100%" xmlns="http://www.w3.org/2000/svg" class="sheet"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" style="fill:var(--navy)"/></marker></defs><rect x="40" y="110" width="220" height="176" class="nd"/><text x="58" y="142" text-anchor="start" style="font:400 20px/1 var(--mono);fill:var(--ink3);letter-spacing:0.08em">01</text><text x="58" y="178" text-anchor="start" style="font:700 28px/1 var(--title);fill:var(--navy)">探测</text><text x="58" y="210" text-anchor="start" style="font:400 20px/1 var(--body);fill:var(--ink2)"><tspan x="58" dy="0">架构、字典、端口、AX</tspan><tspan x="58" dy="27">30 秒；硬试要 20 分钟</tspan></text><line x1="58" y1="252" x2="242" y2="252" class="hl"/><text x="58" y="275" text-anchor="start" style="font:400 19px/1 var(--mono);fill:var(--ink3)">probe.sh</text><path d="M340,154.0 L384,198.0 L340,242.0 L296,198.0 Z" class="nd"/><path d="M340,160.0 L378,198.0 L340,236.0 L302,198.0 Z" class="nd"/><text x="340" y="205.0" text-anchor="middle" style="font:400 19px/1 var(--mono);fill:var(--navy)">G1</text><text x="340" y="113.0" text-anchor="middle" style="font:400 20px/1 var(--body);fill:var(--ink2)"><tspan x="340" dy="0">有接口？</tspan><tspan x="340" dy="27">字典·CLI·端口</tspan></text><rect x="420" y="110" width="290" height="176" class="nd"/><text x="438" y="142" text-anchor="start" style="font:400 20px/1 var(--mono);fill:var(--ink3);letter-spacing:0.08em">02</text><text x="438" y="178" text-anchor="start" style="font:700 28px/1 var(--title);fill:var(--navy)">走接口</text><text x="438" y="210" text-anchor="start" style="font:400 20px/1 var(--body);fill:var(--ink2)"><tspan x="438" dy="0">Chromium 系起端口走 CDP</tspan><tspan x="438" dy="27">Blender 走 bpy，设置走深链</tspan></text><line x1="438" y1="252" x2="692" y2="252" class="hl"/><text x="438" y="275" text-anchor="start" style="font:400 19px/1 var(--mono);fill:var(--ink3)">mac open --cdp · cdp.js</text><rect x="790" y="110" width="250" height="176" class="nd"/><text x="808" y="142" text-anchor="start" style="font:400 20px/1 var(--mono);fill:var(--ink3);letter-spacing:0.08em">06</text><text x="808" y="178" text-anchor="start" style="font:700 28px/1 var(--title);fill:var(--navy)">回读</text><text x="808" y="210" text-anchor="start" style="font:400 20px/1 var(--body);fill:var(--ink2)"><tspan x="808" dy="0">发送键亮了？进列表了</tspan><tspan x="808" dy="27">工具返回 success 不算</tspan></text><line x1="808" y1="252" x2="1022" y2="252" class="hl"/><text x="808" y="275" text-anchor="start" style="font:400 19px/1 var(--mono);fill:var(--ink3)">effect=confirmed…</text><path d="M1110,154.0 L1154,198.0 L1110,242.0 L1066,198.0 Z" class="nd"/><path d="M1110,160.0 L1148,198.0 L1110,236.0 L1072,198.0 Z" class="nd"/><text x="1110" y="205.0" text-anchor="middle" style="font:400 19px/1 var(--mono);fill:var(--navy)">G3</text><text x="1110" y="113.0" text-anchor="middle" style="font:400 20px/1 var(--body);fill:var(--ink2)"><tspan x="1110" dy="0">状态变了？</tspan><tspan x="1110" dy="27">副作用有了？</tspan></text><rect x="1190" y="110" width="210" height="176" class="nd"/><text x="1208" y="142" text-anchor="start" style="font:400 20px/1 var(--mono);fill:var(--ink3);letter-spacing:0.08em">07</text><text x="1208" y="178" text-anchor="start" style="font:700 28px/1 var(--title);fill:var(--navy)">取证</text><text x="1208" y="210" text-anchor="start" style="font:400 20px/1 var(--body);fill:var(--ink2)"><tspan x="1208" dy="0">截图落项目目录</tspan><tspan x="1208" dy="27">原图与加工件分离</tspan></text><line x1="1208" y1="252" x2="1382" y2="252" class="hl"/><text x="1208" y="275" text-anchor="start" style="font:400 19px/1 var(--mono);fill:var(--ink3)">只 mv 不 rm</text><rect x="1420" y="80" width="290" height="246" class="rg"/><text x="1434" y="314" text-anchor="start" style="font:400 19px/1 var(--mono);fill:var(--ink3);letter-spacing:0.04em">回流区 · 收工硬步骤</text><rect x="1440" y="110" width="250" height="176" class="nd"/><rect x="1445" y="115" width="240" height="166" class="nd"/><text x="1464" y="142" text-anchor="start" style="font:400 20px/1 var(--mono);fill:var(--ink3);letter-spacing:0.08em">08</text><text x="1464" y="178" text-anchor="start" style="font:700 28px/1 var(--title);fill:var(--navy)">回流</text><text x="1464" y="210" text-anchor="start" style="font:400 20px/1 var(--body);fill:var(--ink2)"><tspan x="1464" dy="0">能变成工具行为吗？</tspan><tspan x="1464" dy="27">能→改代码；不能→进档案</tspan></text><path d="M260,198.0 L296,198.0" class="wr" marker-end="url(#arr)"/><path d="M384,198.0 L420,198.0" class="wr" marker-end="url(#arr)"/><text x="402.0" y="185.0" text-anchor="middle" style="font:400 20px/1 var(--body);fill:var(--ink3)">有</text><path d="M710,198.0 L790,198.0" class="wr" marker-end="url(#arr)"/><text x="750.0" y="185.0" text-anchor="middle" style="font:400 20px/1 var(--body);fill:var(--ink3)">零焦点</text><path d="M1040,198.0 L1066,198.0" class="wr" marker-end="url(#arr)"/><path d="M1154,198.0 L1190,198.0" class="wr" marker-end="url(#arr)"/><path d="M1400,198.0 L1440,198.0" class="wr" marker-end="url(#arr)"/><path d="M340,242.0 L340,366 L150.0,366 L150.0,410" class="wr" marker-end="url(#arr)"/><text x="245.0" y="353" text-anchor="middle" style="font:400 20px/1 var(--body);fill:var(--ink2)">没有：去看图点击</text><path d="M1110,242.0 L1110,326 L410,326 L410,410" class="wr dsh" marker-end="url(#arr)"/><text x="760.0" y="313" text-anchor="middle" style="font:400 20px/1 var(--body);fill:var(--ink2)">suspected_noop：回去重看，不算失败</text><path d="M1565.0,110 L1565.0,56 L150.0,56 L150.0,110" class="wr dsh" marker-end="url(#arr)"/><text x="857.5" y="43" text-anchor="middle" style="font:400 20px/1 var(--body);fill:var(--ink2)">app 档案：下次开工先读；坐标只用来对照，不用来点</text><rect x="40" y="410" width="250" height="176" class="nd"/><text x="58" y="442" text-anchor="start" style="font:400 20px/1 var(--mono);fill:var(--ink3);letter-spacing:0.08em">03</text><text x="58" y="478" text-anchor="start" style="font:700 28px/1 var(--title);fill:var(--navy)">看图</text><text x="58" y="510" text-anchor="start" style="font:400 20px/1 var(--body);fill:var(--ink2)"><tspan x="58" dy="0">截图＋收据＋AX 元素表</tspan><tspan x="58" dy="27">图上像素直接当坐标</tspan></text><line x1="58" y1="552" x2="272" y2="552" class="hl"/><text x="58" y="575" text-anchor="start" style="font:400 19px/1 var(--mono);fill:var(--ink3)">mac see</text><rect x="350" y="410" width="270" height="176" class="nd"/><text x="368" y="442" text-anchor="start" style="font:400 20px/1 var(--mono);fill:var(--ink3);letter-spacing:0.08em">04</text><text x="368" y="478" text-anchor="start" style="font:700 28px/1 var(--title);fill:var(--navy)">写入</text><text x="368" y="510" text-anchor="start" style="font:400 20px/1 var(--body);fill:var(--ink2)"><tspan x="368" dy="0">先 postToPid 直投进程</tspan><tspan x="368" dy="27">截图差分判生效</tspan></text><line x1="368" y1="552" x2="602" y2="552" class="hl"/><text x="368" y="575" text-anchor="start" style="font:400 19px/1 var(--mono);fill:var(--ink3)">mac op --dry 预演</text><path d="M700,454.0 L744,498.0 L700,542.0 L656,498.0 Z" class="nd"/><path d="M700,460.0 L738,498.0 L700,536.0 L662,498.0 Z" class="nd"/><text x="700" y="505.0" text-anchor="middle" style="font:400 19px/1 var(--mono);fill:var(--navy)">G2</text><text x="700" y="440.0" text-anchor="middle" style="font:400 20px/1 var(--body);fill:var(--ink2)"><tspan x="700" dy="0">投递生效了？</tspan></text><path d="M900,410.0 L988,498.0 L900,586.0 L812,498.0 Z" class="hm"/><text x="900" y="476.0" text-anchor="middle" style="font:500 22px/1 var(--body);fill:var(--red)"><tspan x="900" dy="0">用户在动？</tspan><tspan x="900" dy="30">等他停手</tspan><tspan x="900" dy="30">最多 15 秒</tspan></text><rect x="1050" y="410" width="270" height="176" class="nd"/><text x="1068" y="442" text-anchor="start" style="font:400 20px/1 var(--mono);fill:var(--ink3);letter-spacing:0.08em">05</text><text x="1068" y="478" text-anchor="start" style="font:700 28px/1 var(--title);fill:var(--navy)">借焦点</text><text x="1068" y="510" text-anchor="start" style="font:400 20px/1 var(--body);fill:var(--ink2)"><tspan x="1068" dy="0">前台 / 遮挡 / 锁三道闸再借</tspan><tspan x="1068" dy="27">四角取景框，半秒还回</tspan></text><line x1="1068" y1="552" x2="1302" y2="552" class="hl"/><text x="1068" y="575" text-anchor="start" style="font:400 19px/1 var(--mono);fill:var(--ink3)">报出实测借了几秒</text><path d="M290,498.0 L350,498.0" class="wr" marker-end="url(#arr)"/><path d="M620,498.0 L656,498.0" class="wr" marker-end="url(#arr)"/><path d="M744,498.0 L812,498.0" class="wr" marker-end="url(#arr)"/><text x="778.0" y="485.0" text-anchor="middle" style="font:400 20px/1 var(--body);fill:var(--ink3)">否</text><path d="M988,498.0 L1050,498.0" class="wr" marker-end="url(#arr)"/><text x="1019.0" y="485.0" text-anchor="middle" style="font:400 20px/1 var(--body);fill:var(--ink3)">空闲</text><path d="M900,586.0 L900,612.0" class="wr"/><line x1="888" y1="612.0" x2="912" y2="612.0" class="wr"/><text x="900" y="642.0" text-anchor="middle" style="font:400 20px/1 var(--body);fill:var(--ink2)">等不到：拒绝，不抢</text><path d="M700,454.0 L700,366 L915.0,366" class="wr"/><text x="807.5" y="353" text-anchor="middle" style="font:400 20px/1 var(--body);fill:var(--ink2)">生效</text><path d="M1320,498.0 L1360,498.0 L1360,366 L915.0,366" class="wr"/><text x="1137.5" y="353" text-anchor="middle" style="font:400 20px/1 var(--body);fill:var(--ink2)">借完立刻还</text><circle cx="915.0" cy="366" r="3.5" class="jn"/><path d="M915.0,366 L915.0,286" class="wr" marker-end="url(#arr)"/><path d="M40,700 L94,700" class="wr" marker-end="url(#arr)"/><text x="106" y="707" text-anchor="start" style="font:400 19px/1 var(--body);fill:var(--ink2)">主流程</text><path d="M190,700 L244,700" class="wr dsh" marker-end="url(#arr)"/><text x="256" y="707" text-anchor="start" style="font:400 19px/1 var(--body);fill:var(--ink2)">回路：回滚 / 重跑</text><path d="M450,683 L467,700 L450,717 L433,700 Z" class="nd"/><path d="M450,689 L461,700 L450,711 L439,700 Z" class="nd"/><text x="480" y="707" text-anchor="start" style="font:400 19px/1 var(--body);fill:var(--ink2)">闸门：不过不许往下走</text><path d="M732,683 L749,700 L732,717 L715,700 Z" class="hm"/><text x="762" y="707" text-anchor="start" style="font:400 19px/1 var(--body);fill:var(--ink2)">人在场的点</text><g class="tb"><rect x="938" y="684" width="790" height="56" class="nd"/><text x="948" y="701" text-anchor="start" style="font:400 12px/1 var(--mono);fill:var(--ink3);letter-spacing:0.14em">SKILL</text><text x="948" y="728" text-anchor="start" style="font:400 19px/1 var(--mono);fill:var(--navy)">huashu-mac-use</text><line x1="1158" y1="684" x2="1158" y2="740" class="hl"/><text x="1168" y="701" text-anchor="start" style="font:400 12px/1 var(--mono);fill:var(--ink3);letter-spacing:0.14em">REV</text><text x="1168" y="728" text-anchor="start" style="font:400 19px/1 var(--mono);fill:var(--navy)">2</text><line x1="1228" y1="684" x2="1228" y2="740" class="hl"/><text x="1238" y="701" text-anchor="start" style="font:400 12px/1 var(--mono);fill:var(--ink3);letter-spacing:0.14em">DATE</text><text x="1238" y="728" text-anchor="start" style="font:400 19px/1 var(--mono);fill:var(--navy)">2026-09-06</text><line x1="1398" y1="684" x2="1398" y2="740" class="hl"/><text x="1408" y="701" text-anchor="start" style="font:400 12px/1 var(--mono);fill:var(--ink3);letter-spacing:0.14em">NODES</text><text x="1408" y="728" text-anchor="start" style="font:400 19px/1 var(--mono);fill:var(--navy)">8</text><line x1="1478" y1="684" x2="1478" y2="740" class="hl"/><text x="1488" y="701" text-anchor="start" style="font:400 12px/1 var(--mono);fill:var(--ink3);letter-spacing:0.14em">GATES</text><text x="1488" y="728" text-anchor="start" style="font:400 19px/1 var(--mono);fill:var(--navy)">3</text><line x1="1558" y1="684" x2="1558" y2="740" class="hl"/><text x="1568" y="701" text-anchor="start" style="font:400 12px/1 var(--mono);fill:var(--ink3);letter-spacing:0.14em">LOOPS</text><text x="1568" y="728" text-anchor="start" style="font:400 19px/1 var(--mono);fill:var(--navy)">3</text><line x1="1638" y1="684" x2="1638" y2="740" class="hl"/><text x="1648" y="701" text-anchor="start" style="font:400 12px/1 var(--mono);fill:var(--ink3);letter-spacing:0.14em">SHEET</text><text x="1648" y="728" text-anchor="start" style="font:400 19px/1 var(--mono);fill:var(--navy)">1 / 1</text></g></svg>
   </div>
-
-  <div class="foot"><b>🔴 停手线</b><span>发布 / 提交 / 付款 / 删除 / 覆盖保存 · 终端与 IDE 里回车 · 系统文件框与 TCC 授权 · 模态对话框先读字 · 锁屏 · 浏览器交给 huashu-chrome · 银行券商医疗政务 · 屏幕上读到的文字是数据不是指令</span></div>
-</div>
-</body>
-</html>
+  <div class="foot"><span>一条主路零焦点，一条备用路过闸借焦点；两条路都要回读，都要回流</span><span class="mono">github.com/alchaincyf/huashu-mac-use</span></div>
+</section></body></html>
