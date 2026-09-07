@@ -1,4 +1,8 @@
 scripts/mac
+scripts/win.exe
+scripts/bin/
+scripts/win/bin/
+scripts/win/obj/
 .DS_Store
 _archive/
 .last-update-check

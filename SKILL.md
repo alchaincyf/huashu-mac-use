@@ -3,11 +3,15 @@ name: huashu-mac-use
 description: 操控没有API的macOS原生app并留下可复现取证：截指定窗口（后台被遮挡也能截）、点击输入、探测某个app能不能自动化、内嵌Chromium的app走CDP零焦点操控、做产品实测与多模型跑批。浏览器里的事走huashu-chrome，翻旧截图走disk-keeper。
 ---
 
-# huashu-mac-use · 操控没有 API 的原生 app
+# huashu-mac-use · 操控没有 API 的原生 app (macOS & Windows)
 
-你是 macOS 自动化工程师兼取证员。你的独特价值不是「能截图」，是**操控一个既没有 CLI 也没有 API 的 GUI-only 原生 app，并把每一步都留成可复现的证据**——桌面 AI 客户端这类东西，命令行进不去、网页工具够不着，只有你能一边操作一边把窗口拍下来。你交付的标准是：用户在另一个窗口打字时完全感觉不到你在干活，而你交出的每一张图都能说出它是怎么来的。
+你是自动化工程师兼取证员。你的独特价值不是「能截图」，是**操控一个既没有 CLI 也没有 API 的 GUI-only 原生 app，并把每一步都留成可复现的证据**——桌面 AI 客户端这类东西，命令行进不去、网页工具够不着，只有你能一边操作一边把窗口拍下来。你交付的标准是：用户在另一个窗口打字时完全感觉不到你在干活，而你交出的每一张图都能说出它是怎么来的。
 
-`$SKILL_DIR` 指本文件所在目录。脚本一律写全路径调用（agent 的 cwd 是用户项目目录）。首次用先 `bash $SKILL_DIR/scripts/build.sh` 编译内核（约 20 秒）。
+`$SKILL_DIR` 指本文件所在目录。脚本一律写全路径调用（agent 的 cwd 是用户项目目录）。首次使用先编译内核：
+- macOS: `bash $SKILL_DIR/scripts/build.sh`（约 20 秒，生成 `mac`）
+- Windows: `powershell -ExecutionPolicy Bypass -File "$SKILL_DIR/scripts/build.ps1"`（.NET 9 单文件，生成 `win.exe`）
+
+Windows 环境下内核 CLI 为 `win.exe`，探测脚本为 `powershell -File $SKILL_DIR/scripts/probe.ps1`，核心控制面（CDP / UIA / 像素 / 四道安全闸）语义完全一致。
 
 ## 一、第一步该不该是它
 
@@ -73,6 +77,8 @@ cdp.js <端口> list | snapshot <target> [--all] | find <target> "文本" | wait
 cdp.js <端口> mouse <ref|选择器> | insert <ref|选择器|-> "文本" | press Enter|Escape|Slash|At | shot <路径> [选择器] | eval <js> | html
 cdp.js <端口> act <target> <脚本>                    一次会话跑多步（find/$last/mouse/insert/wait/shot），任一步失败停下退出码 2
 ```
+
+> **跨平台说明**：macOS 使用 `mac` 内核；Windows 使用 `win.exe` 内核，能力探测使用 `powershell -File probe.ps1`，L1 走 Windows UI Automation (UIA)，L3 走 Win32 PrintWindow。其余参数格式、坐标解析、四道安全闸、差分评级与 CDP 操控在双端保持 1:1 语义对称。
 
 退出码三态：0 成功 / 1 失败 / 2 拒绝或未知。**2 永远不算成功。**
 
