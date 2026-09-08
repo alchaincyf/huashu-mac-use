@@ -1,0 +1,52 @@
+<svg width="1200" height="400" viewBox="0 0 1200 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&amp;family=Noto+Serif+SC:wght@700;900&amp;display=swap');
+    </style>
+    <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D4532B"/><stop offset="100%" stop-color="#A83518"/>
+    </linearGradient>
+    <linearGradient id="barGradSoft" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8B5E3C"/><stop offset="100%" stop-color="#6E4A2E"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="400" fill="#111111"/>
+  <rect x="60" y="48" width="3" height="304" fill="#D4532B"/>
+  <rect x="60" y="48" width="760" height="2" fill="#FFFFFF" opacity="0.15"/>
+  <rect x="60" y="350" width="760" height="1" fill="#FFFFFF" opacity="0.15"/>
+  <rect x="860" y="80" width="1" height="240" fill="#FFFFFF" opacity="0.08"/>
+  <text x="80" y="88" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" letter-spacing="3" fill="#D4532B">AGENT SKILL · macOS COMPUTER USE</text>
+  <text x="80" y="178" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="68" font-weight="900" fill="#FFFFFF" letter-spacing="-2">huashu-mac-use</text>
+  <text x="80" y="222" font-family="'Noto Serif SC', 'Source Han Serif', 'Inter', serif" font-size="22" font-weight="700" fill="#EEEEEE" letter-spacing="1">操控没有 API 的 Mac 原生 app</text>
+  <text x="80" y="284" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="15" font-weight="500" fill="#BBBBBB" letter-spacing="0.5">读随便读</text>
+  <text x="156" y="284" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="15" font-weight="700" fill="#D4532B">·</text>
+  <text x="168" y="284" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="15" font-weight="500" fill="#BBBBBB" letter-spacing="0.5">写不打扰</text>
+  <text x="244" y="284" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="15" font-weight="700" fill="#D4532B">·</text>
+  <text x="256" y="284" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="15" font-weight="500" fill="#BBBBBB" letter-spacing="0.5">每步留证据</text>
+  <text x="80" y="312" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="14" font-weight="400" fill="#888888" letter-spacing="0.3">四层通道阶梯  ·  借焦点前过四道闸  ·  动作后自动差分验证</text>
+  <text x="80" y="370" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="12" font-weight="400" fill="#666666" letter-spacing="0.3">macOS · Claude Code / Codex / Cursor / 任何读 SKILL.md 的 runtime</text>
+  <text x="890" y="108" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="10" font-weight="700" letter-spacing="2" fill="#D4532B" opacity="0.9">CONTROL LADDER</text>
+  <rect x="890" y="132" width="4" height="34" fill="#D4532B"/>
+  <rect x="902" y="132" width="258" height="34" fill="#1A1A1A" stroke="#2C2C2C" stroke-width="1"/>
+  <text x="914" y="147" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="10" font-weight="700" letter-spacing="1.5" fill="#D4532B">L0</text>
+  <text x="940" y="147" font-family="'Noto Serif SC', 'Source Han Serif', 'Inter', serif" font-size="12" font-weight="700" fill="#DDDDDD" opacity="1.0">结构接口</text>
+  <text x="914" y="160" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="9" font-weight="400" fill="#777777">CLI · AppleScript · CDP</text>
+  <rect x="890" y="176" width="4" height="34" fill="#B04A2A"/>
+  <rect x="902" y="176" width="258" height="34" fill="#1A1A1A" stroke="#2C2C2C" stroke-width="1"/>
+  <text x="914" y="191" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="10" font-weight="700" letter-spacing="1.5" fill="#B04A2A">L1</text>
+  <text x="940" y="191" font-family="'Noto Serif SC', 'Source Han Serif', 'Inter', serif" font-size="12" font-weight="700" fill="#DDDDDD" opacity="0.85">AX 语义树</text>
+  <text x="914" y="204" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="9" font-weight="400" fill="#777777">mac ax / axset</text>
+  <rect x="890" y="220" width="4" height="34" fill="#8B5E3C"/>
+  <rect x="902" y="220" width="258" height="34" fill="#1A1A1A" stroke="#2C2C2C" stroke-width="1"/>
+  <text x="914" y="235" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="10" font-weight="700" letter-spacing="1.5" fill="#8B5E3C">L2</text>
+  <text x="940" y="235" font-family="'Noto Serif SC', 'Source Han Serif', 'Inter', serif" font-size="12" font-weight="700" fill="#DDDDDD" opacity="0.7">窗口坐标</text>
+  <text x="914" y="248" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="9" font-weight="400" fill="#777777">mac see → mac op</text>
+  <rect x="890" y="264" width="4" height="34" fill="#5A5A5A"/>
+  <rect x="902" y="264" width="258" height="34" fill="#1A1A1A" stroke="#2C2C2C" stroke-width="1"/>
+  <text x="914" y="279" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="10" font-weight="700" letter-spacing="1.5" fill="#5A5A5A">L3</text>
+  <text x="940" y="279" font-family="'Noto Serif SC', 'Source Han Serif', 'Inter', serif" font-size="12" font-weight="700" fill="#DDDDDD" opacity="0.6">像素</text>
+  <text x="914" y="292" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="9" font-weight="400" fill="#777777">mac shot · 每步取证</text>
+  <path d="M 884 138 L 884 302" stroke="#333333" stroke-width="1" stroke-dasharray="2 3"/>
+  <text x="890" y="326" font-family="'Inter', system-ui, -apple-system, sans-serif" font-size="9" font-weight="500" letter-spacing="1" fill="#666666">先探测 → 从上往下试 → 成本差数量级</text>
+</svg>
