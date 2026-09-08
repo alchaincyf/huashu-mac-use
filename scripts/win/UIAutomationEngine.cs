@@ -119,6 +119,161 @@ public static class UIAutomationEngine
         return count;
     }
 
+    public static (bool ok, string message) TriggerElement(IntPtr hwnd, string elRef, int winOriginX, int winOriginY, int winW, int winH)
+    {
+        try
+        {
+            if (WindowManager.IsIconic(hwnd))
+            {
+                SafetyGates.ShowWindow(hwnd, SafetyGates.SW_RESTORE);
+                Thread.Sleep(250);
+            }
+
+            var root = AutomationElement.FromHandle(hwnd);
+            if (root == null) return (false, "Cannot get AutomationElement from window handle");
+
+            var condition = new PropertyCondition(AutomationElement.IsOffscreenProperty, false);
+            var elements = root.FindAll(TreeScope.Descendants, condition);
+
+            int index = 1;
+            foreach (AutomationElement el in elements)
+            {
+                try
+                {
+                    var ct = el.Current.ControlType;
+                    if (!ActionableTypes.Contains(ct)) continue;
+
+                    var rect = el.Current.BoundingRectangle;
+                    if (rect.IsEmpty || rect.Width <= 2 || rect.Height <= 2) continue;
+
+                    double cx = rect.X + rect.Width / 2.0 - winOriginX;
+                    double cy = rect.Y + rect.Height / 2.0 - winOriginY;
+                    if (cx < 0 || cy < 0 || cx > winW || cy > winH) continue;
+
+                    string curRef = $"e{index++}";
+                    if (string.Equals(curRef, elRef, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return ExecutePattern(el);
+                    }
+                }
+                catch { }
+            }
+            return (false, $"Element {elRef} not found in active window elements");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"UIA Trigger error: {ex.Message}");
+        }
+    }
+
+    public static (bool ok, string message) TriggerElementByName(IntPtr hwnd, string keyword)
+    {
+        try
+        {
+            if (WindowManager.IsIconic(hwnd))
+            {
+                SafetyGates.ShowWindow(hwnd, SafetyGates.SW_RESTORE);
+                Thread.Sleep(250);
+            }
+
+            var root = AutomationElement.FromHandle(hwnd);
+            if (root == null) return (false, "Cannot get AutomationElement from window handle");
+
+            var condition = new PropertyCondition(AutomationElement.IsOffscreenProperty, false);
+            var elements = root.FindAll(TreeScope.Descendants, condition);
+
+            foreach (AutomationElement el in elements)
+            {
+                try
+                {
+                    string name = el.Current.Name ?? "";
+                    string autoId = el.Current.AutomationId ?? "";
+                    if (!name.Contains(keyword, StringComparison.OrdinalIgnoreCase) &&
+                        !autoId.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var res = ExecutePattern(el);
+                    if (res.ok) return res;
+                }
+                catch { }
+            }
+            return (false, $"No actionable element matching \"{keyword}\" found");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"UIA TriggerByName error: {ex.Message}");
+        }
+    }
+
+    private static (bool ok, string message) ExecutePattern(AutomationElement el)
+    {
+        string name = el.Current.Name ?? el.Current.AutomationId ?? "";
+        string role = el.Current.ControlType.ProgrammaticName.Replace("ControlType.", "");
+
+        // 1. TogglePattern (for checkboxes, toggleswitches)
+        if (el.TryGetCurrentPattern(TogglePattern.Pattern, out object? tpObj) && tpObj is TogglePattern tp)
+        {
+            var before = tp.Current.ToggleState;
+            tp.Toggle();
+            Thread.Sleep(100);
+            return (true, $"L1 TogglePattern: \"{name}\" ({role}) toggled from {before} to {tp.Current.ToggleState}");
+        }
+
+        // 2. InvokePattern (for buttons, menu items)
+        if (el.TryGetCurrentPattern(InvokePattern.Pattern, out object? ipObj) && ipObj is InvokePattern ip)
+        {
+            ip.Invoke();
+            Thread.Sleep(100);
+            return (true, $"L1 InvokePattern: \"{name}\" ({role}) invoked");
+        }
+
+        // 3. SelectionItemPattern (for list items, radio buttons, tabs)
+        if (el.TryGetCurrentPattern(SelectionItemPattern.Pattern, out object? spObj) && spObj is SelectionItemPattern sp)
+        {
+            sp.Select();
+            Thread.Sleep(100);
+            return (true, $"L1 SelectionItemPattern: \"{name}\" ({role}) selected");
+        }
+
+        // 4. ExpandCollapsePattern
+        if (el.TryGetCurrentPattern(ExpandCollapsePattern.Pattern, out object? epObj) && epObj is ExpandCollapsePattern ep)
+        {
+            if (ep.Current.ExpandCollapseState == ExpandCollapseState.Expanded)
+                ep.Collapse();
+            else
+                ep.Expand();
+            Thread.Sleep(100);
+            return (true, $"L1 ExpandCollapsePattern: \"{name}\" ({role}) toggled");
+        }
+
+        // 5. Try children/descendants for actionable patterns (e.g. inner ToggleSwitch or Button)
+        try
+        {
+            var children = el.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.IsOffscreenProperty, false));
+            foreach (AutomationElement child in children)
+            {
+                if (child.TryGetCurrentPattern(TogglePattern.Pattern, out object? cTp) && cTp is TogglePattern cToggle)
+                {
+                    var before = cToggle.Current.ToggleState;
+                    cToggle.Toggle();
+                    Thread.Sleep(100);
+                    return (true, $"L1 Child TogglePattern: \"{child.Current.Name}\" toggled from {before} to {cToggle.Current.ToggleState}");
+                }
+                if (child.TryGetCurrentPattern(InvokePattern.Pattern, out object? cIp) && cIp is InvokePattern cInvoke)
+                {
+                    cInvoke.Invoke();
+                    Thread.Sleep(100);
+                    return (true, $"L1 Child InvokePattern: \"{child.Current.Name}\" invoked");
+                }
+            }
+        }
+        catch { }
+
+        return (false, $"Element \"{name}\" ({role}) does not support Toggle, Invoke, SelectionItem, or ExpandCollapse pattern");
+    }
+
     public static (bool ok, string readback) SetFirstEditableValue(int pid, string value)
     {
         try
@@ -153,3 +308,4 @@ public static class UIAutomationEngine
         return (false, "未找到支持 ValuePattern 的可编辑控件");
     }
 }
+

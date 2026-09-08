@@ -34,6 +34,8 @@ public static class Program
   win key <pid> <keycode> [ctrl|alt|shift|win] 模拟按键（走全局流，回车有终端保护闸）
   win ax <pid>                                UIA 探测（可编辑控件数统计）
   win axset <pid> <文本>                      通过 UIA ValuePattern 给第一个可编辑控件设值并读回
+  win axtoggle <hwnd> <eN|关键词>             通过 UIA TogglePattern 零焦点直接翻转开关状态
+  win axclick <hwnd> <eN|关键词>              通过 UIA InvokePattern 零焦点直接触发按钮点击
   win op <hwnd> <x> <y> <文本> [@图] [send <sx> <sy>] [shot <路径>] [--bg|--fast] [--force] [--dry]
                                               写操作默认入口。默认后台优先阶梯：
                                                 ① PostMessage/UIA 零焦点写入 → 截图差分验证 → 生效即结束
@@ -315,14 +317,17 @@ public static class Program
             case "clickin":
             case "hoverin":
                 {
-                    if (argList.Count < 3) Die($"用法: win {cmd} <hwnd> <x> <y> [@图] [--dry]");
+                    bool isElRef = argList.Count > 1 && argList[1].StartsWith('e') && argList[1].Contains('@');
+                    if (!isElRef && argList.Count < 3) Die($"用法: win {cmd} <hwnd> <x> <y> [@图] [--dry]");
+                    if (argList.Count < 2) Die($"用法: win {cmd} <hwnd> eN@see.json [--dry]");
                     if (!long.TryParse(argList[0], out long hwndVal)) Die("窗口句柄必须是有效数字");
 
                     var hwnd = (IntPtr)hwndVal;
                     var win = WindowManager.GetWindow(hwnd);
                     if (win == null) Die($"窗口 {hwndVal} 不存在");
 
-                    var (pt, note) = WindowManager.ResolveCoord(argList[1], argList[2], win.W, win.H, refImg);
+                    string ys = isElRef ? "0" : argList[2];
+                    var (pt, note) = WindowManager.ResolveCoord(argList[1], ys, win.W, win.H, refImg);
                     var screenPt = new Point(win.X + pt.X, win.Y + pt.Y);
 
                     if (dry)
@@ -346,6 +351,19 @@ public static class Program
 
                     if (cmd == "clickin")
                     {
+                        if (isElRef)
+                        {
+                            string elRef = argList[1].Split('@')[0];
+                            var (l1Ok, l1Msg) = UIAutomationEngine.TriggerElement(hwnd, elRef, win.X, win.Y, win.W, win.H);
+                            if (l1Ok)
+                            {
+                                Console.WriteLine($"clicked (L1 UIA) {l1Msg} -> 零焦点直触发 [OK]");
+                                Console.WriteLine($"-> 必须回读：win shot {hwndVal} <路径>");
+                                break;
+                            }
+                            Console.WriteLine($"[L1 fallback] {l1Msg}，降级走 L2 窗口坐标点击");
+                        }
+
                         InputSimulator.GetCursorPos(out POINT saved);
                         InputSimulator.ClickAt(screenPt);
                         InputSimulator.MoveMouse(new Point(saved.X, saved.Y));
@@ -587,9 +605,55 @@ public static class Program
                     break;
                 }
 
+            case "axclick":
+            case "axtoggle":
+                {
+                    if (argList.Count < 2) Die("用法: win axclick|axtoggle <hwnd> <eN|名称关键词>");
+                    if (!long.TryParse(argList[0], out long hwndVal)) Die("窗口句柄必须是有效数字");
+
+                    var hwnd = (IntPtr)hwndVal;
+                    var win = WindowManager.GetWindow(hwnd);
+                    if (win == null) Die($"窗口 {hwndVal} 不存在");
+
+                    string target = argList[1];
+                    (bool ok, string msg) res;
+                    if (target.StartsWith('e') && int.TryParse(target[1..], out _))
+                    {
+                        res = UIAutomationEngine.TriggerElement(hwnd, target, win.X, win.Y, win.W, win.H);
+                    }
+                    else
+                    {
+                        res = UIAutomationEngine.TriggerElementByName(hwnd, target);
+                    }
+
+                    if (res.ok)
+                    {
+                        Console.WriteLine($"[L1 UIA] {res.msg} [OK]");
+                    }
+                    else
+                    {
+                        Die($"[L1 UIA] 触发失败: {res.msg}", 1);
+                    }
+                    break;
+                }
+
+            case "restore":
+            case "show":
+                {
+                    if (argList.Count < 1) Die("用法: win restore <hwnd>");
+                    if (!long.TryParse(argList[0], out long hwndVal)) Die("窗口句柄必须是有效数字");
+                    var hwnd = (IntPtr)hwndVal;
+                    SafetyGates.ShowWindow(hwnd, SafetyGates.SW_RESTORE);
+                    SafetyGates.SetForegroundWindow(hwnd);
+                    Console.WriteLine($"窗口 {hwndVal} 已恢复显示");
+                    break;
+                }
+
             case "op":
                 {
-                    if (argList.Count < 4) Die("用法: win op <hwnd> <x> <y> <文本> [@图] [send <sx> <sy>] [shot <路径>] [--bg|--fast] [--force] [--dry]");
+                    bool isElRef = argList.Count > 1 && argList[1].StartsWith('e') && argList[1].Contains('@');
+                    int minNeed = isElRef ? 2 : 3;
+                    if (argList.Count < minNeed) Die("用法: win op <hwnd> <x> <y> [文本] [@图] [send <sx> <sy>] [shot <路径>] [--bg|--fast] [--force] [--dry]");
                     if (!long.TryParse(argList[0], out long hwndVal)) Die("窗口句柄必须是有效数字");
 
                     var hwnd = (IntPtr)hwndVal;
@@ -597,11 +661,21 @@ public static class Program
                     if (win == null) Die($"窗口 {hwndVal} 不存在");
 
                     string xs = argList[1];
-                    string ys = argList[2];
-                    string text = argList[3];
+                    string ys = isElRef ? "0" : argList[2];
+
+                    int textIdx = isElRef ? 2 : 3;
+                    string text = "";
+                    if (argList.Count > textIdx &&
+                        !argList[textIdx].Equals("send", StringComparison.OrdinalIgnoreCase) &&
+                        !argList[textIdx].Equals("shot", StringComparison.OrdinalIgnoreCase) &&
+                        !argList[textIdx].StartsWith('@'))
+                    {
+                        text = argList[textIdx];
+                        textIdx++;
+                    }
 
                     string? sendXs = null, sendYs = null, shotPath = null;
-                    int i = 4;
+                    int i = textIdx;
                     while (i < argList.Count)
                     {
                         if (argList[i].Equals("send", StringComparison.OrdinalIgnoreCase) && i + 2 < argList.Count)
@@ -639,6 +713,28 @@ public static class Program
                     if (SafetyGates.ShellOwners.Contains(win.Owner) && sendPt.HasValue && !force)
                     {
                         Die($"refused: {win.Owner} 是终端/IDE 类窗口，点发送等于执行命令。只填不发去掉 send；确认执行加 --force", 2);
+                    }
+
+                    // --- L1 UIA 语义直投（零焦点/不受坐标高分屏干扰）---
+                    if (isElRef && string.IsNullOrEmpty(text))
+                    {
+                        string elRef = argList[1].Split('@')[0];
+                        var (l1Ok, l1Msg) = UIAutomationEngine.TriggerElement(hwnd, elRef, win.X, win.Y, win.W, win.H);
+                        if (l1Ok)
+                        {
+                            Console.WriteLine($"① L1 UIA 语义直触发 -> {l1Msg} [OK]");
+                            if (!string.IsNullOrEmpty(shotPath))
+                            {
+                                Thread.Sleep(600);
+                                using var bAfter = CaptureEngine.CaptureWindowBackground(hwnd, win.W, win.H);
+                                if (bAfter != null)
+                                {
+                                    bAfter.Save(shotPath, System.Drawing.Imaging.ImageFormat.Png);
+                                    Console.WriteLine($"截图: {shotPath}");
+                                }
+                            }
+                            return;
+                        }
                     }
 
                     // --- 第一档：后台直投 ---
@@ -710,7 +806,10 @@ public static class Program
                         Die("refused: 另一个 win 进程正持有借焦点锁，等 5 秒未释放", 2);
                     }
 
-                    GateUserPresence("借焦点会抢走前台窗口。");
+                    if (!force)
+                    {
+                        GateUserPresence("借焦点会抢走前台窗口。");
+                    }
                     FlashHUD($"huashu-win-use 正在操作「{win.Owner}」", 1600);
 
                     var (prevFgHwnd, _, prevFgName) = SafetyGates.GetForegroundProcess();
@@ -737,6 +836,7 @@ public static class Program
                     var stableBounds = WindowManager.GetStableBounds(hwnd) ?? (win.X, win.Y, win.W, win.H);
                     var screenClick = new Point(stableBounds.x + clickPt.X, stableBounds.y + clickPt.Y);
                     InputSimulator.ClickAt(screenClick);
+                    Thread.Sleep(200);
 
                     if (!string.IsNullOrEmpty(text))
                     {

@@ -287,15 +287,19 @@ public static class WindowManager
             string json = File.ReadAllText(jsonPath);
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
-            if (root.TryGetProperty("elements", out var elements))
+            if (root.TryGetProperty("elements", out var elements) || root.TryGetProperty("Elements", out elements))
             {
                 foreach (var el in elements.EnumerateArray())
                 {
-                    if (el.TryGetProperty("ref", out var r) && r.GetString() == elRef)
+                    string? rStr = null;
+                    if (el.TryGetProperty("Ref", out var r) || el.TryGetProperty("ref", out r)) rStr = r.GetString();
+                    if (string.Equals(rStr, elRef, StringComparison.OrdinalIgnoreCase))
                     {
-                        double cx = el.GetProperty("cx").GetDouble();
-                        double cy = el.GetProperty("cy").GetDouble();
-                        string title = el.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "";
+                        double cx = 0, cy = 0;
+                        if (el.TryGetProperty("Cx", out var cxProp) || el.TryGetProperty("cx", out cxProp)) cx = cxProp.GetDouble();
+                        if (el.TryGetProperty("Cy", out var cyProp) || el.TryGetProperty("cy", out cyProp)) cy = cyProp.GetDouble();
+                        string title = "";
+                        if (el.TryGetProperty("Title", out var t) || el.TryGetProperty("title", out t)) title = t.GetString() ?? "";
                         return (new Point((int)cx, (int)cy), $"Element {elRef} \"{title}\" -> WinRel({(int)cx},{(int)cy})");
                     }
                 }
