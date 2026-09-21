@@ -38,48 +38,63 @@ public static class UIAutomationEngine
 
         try
         {
-            var root = AutomationElement.FromHandle(hwnd);
-            if (root == null) return list;
-
-            var condition = new PropertyCondition(AutomationElement.IsOffscreenProperty, false);
-            var elements = root.FindAll(TreeScope.Descendants, condition);
-
-            int index = 1;
-            foreach (AutomationElement el in elements)
+            var task = System.Threading.Tasks.Task.Run(() =>
             {
-                if (list.Count >= 150) break;
+                var subList = new List<UIAElementInfo>();
+                var root = AutomationElement.FromHandle(hwnd);
+                if (root == null) return subList;
 
-                try
+                var condition = new PropertyCondition(AutomationElement.IsOffscreenProperty, false);
+                var elements = root.FindAll(TreeScope.Descendants, condition);
+
+                int index = 1;
+                foreach (AutomationElement el in elements)
                 {
-                    var ct = el.Current.ControlType;
-                    if (!ActionableTypes.Contains(ct)) continue;
+                    if (subList.Count >= 150) break;
 
-                    var rect = el.Current.BoundingRectangle;
-                    if (rect.IsEmpty || rect.Width <= 2 || rect.Height <= 2) continue;
-
-                    double cx = rect.X + rect.Width / 2.0 - winOriginX;
-                    double cy = rect.Y + rect.Height / 2.0 - winOriginY;
-
-                    if (cx < 0 || cy < 0 || cx > winW || cy > winH) continue;
-
-                    string name = el.Current.Name ?? string.Empty;
-                    if (string.IsNullOrWhiteSpace(name))
+                    try
                     {
-                        name = el.Current.AutomationId ?? string.Empty;
+                        var ct = el.Current.ControlType;
+                        if (!ActionableTypes.Contains(ct)) continue;
+
+                        var rect = el.Current.BoundingRectangle;
+                        if (rect.IsEmpty || rect.Width <= 2 || rect.Height <= 2) continue;
+
+                        double cx = rect.X + rect.Width / 2.0 - winOriginX;
+                        double cy = rect.Y + rect.Height / 2.0 - winOriginY;
+
+                        if (cx < 0 || cy < 0 || cx > winW || cy > winH) continue;
+
+                        string name = el.Current.Name ?? string.Empty;
+                        if (string.IsNullOrWhiteSpace(name))
+                        {
+                            name = el.Current.AutomationId ?? string.Empty;
+                        }
+                        if (name.Length > 40) name = name[..40];
+
+                        subList.Add(new UIAElementInfo
+                        {
+                            Ref = $"e{index++}",
+                            Role = ct.ProgrammaticName.Replace("ControlType.", ""),
+                            Title = name,
+                            Cx = cx,
+                            Cy = cy,
+                            Enabled = el.Current.IsEnabled
+                        });
                     }
-                    if (name.Length > 40) name = name[..40];
-
-                    list.Add(new UIAElementInfo
-                    {
-                        Ref = $"e{index++}",
-                        Role = ct.ProgrammaticName.Replace("ControlType.", ""),
-                        Title = name,
-                        Cx = cx,
-                        Cy = cy,
-                        Enabled = el.Current.IsEnabled
-                    });
+                    catch { }
                 }
-                catch { }
+                return subList;
+            });
+
+            if (task.Wait(TimeSpan.FromSeconds(3)))
+            {
+                return task.Result;
+            }
+            else
+            {
+                Console.WriteLine("  [WARNING] UIA 遍历超时（>3s），目标应用可能处于忙碌状态，安全降级为空列表。");
+                return list;
             }
         }
         catch { }
