@@ -12,14 +12,14 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-Standard-green)](https://agentskills.io)
-[![Platform](https://img.shields.io/badge/Platform-macOS-black)](#前置条件)
-[![Multi-Runtime](https://img.shields.io/badge/Runtime-Claude%20Code%20·%20Codex%20·%20Kimi%20Code%20·%20Cursor%20·%20OpenClaw-blueviolet)](#安装)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-black)](#前置条件)
+[![Multi-Runtime](https://img.shields.io/badge/Runtime-Claude%20Code%20·%20Codex%20·%20Antigravity%20·%20Cursor%20·%20OpenClaw-blueviolet)](#安装)
 
 <br>
 
-**让任何 agent 操控 Mac 上没有 API 的原生 app，并把每一步拍成可复现的取证。**
+**让任何 agent 操控桌面（macOS & Windows）上没有 API 的原生 app，并把每一步拍成可复现的取证。**
 
-<sub>基于开放的 [Agent Skills 协议](https://agentskills.io)，Claude Code、Codex、Kimi Code、Cursor、OpenClaw、WorkBuddy、豆包工作、千问办公、ZCode 等任何能读 SKILL.md 的 runtime 都能装。</sub>
+<sub>基于开放的 [Agent Skills 协议](https://agentskills.io)，Claude Code、Codex、Antigravity、Kimi Code、Cursor、OpenClaw 等任何能读 SKILL.md 的 runtime 都能装。</sub>
 
 <br>
 
@@ -61,10 +61,16 @@
 
 ### 前置条件
 
+**macOS**:
 - macOS（实测 macOS 26，14 以上大概率可用），Apple Silicon 或 Intel 都行
 - Xcode Command Line Tools（`xcode-select --install`），内核是一个 Swift 文件，首次用编译 20 秒
 - Node.js（内嵌 Chromium 的 app 走 CDP 时用）
-- 给**你正在用的终端 app**（Terminal / iTerm / Cursor / FanBox…）授「屏幕录制」和「辅助功能」。注意是授给终端 app，不是授给脚本，换个终端要重新授
+- 给**你正在用的终端 app**（Terminal / iTerm / Cursor / FanBox…）授「屏幕录制」和「辅助功能」
+
+**Windows**:
+- Windows 10 / 11 (x64)
+- .NET 9 SDK（用于编译单文件内核 `win.exe`）
+- Node.js（内嵌 Chromium 的 app 走 CDP 时用）
 
 ### 方式一：把链接丢给 agent
 
@@ -80,18 +86,24 @@ npx skills add alchaincyf/huashu-mac-use
 
 ### 方式三：手动
 
+**macOS**:
 ```bash
-git clone https://github.com/alchaincyf/huashu-mac-use.git ~/.claude/skills/huashu-mac-use   # Codex 是 ~/.codex/skills，其余 runtime 同理
+git clone https://github.com/alchaincyf/huashu-mac-use.git ~/.claude/skills/huashu-mac-use
 bash ~/.claude/skills/huashu-mac-use/scripts/build.sh   # 编译内核，一次就好
+```
+
+**Windows**:
+```powershell
+git clone https://github.com/alchaincyf/huashu-mac-use.git $env:USERPROFILE\.claude\skills\huashu-mac-use
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\skills\huashu-mac-use\scripts\build.ps1"
 ```
 
 装完先探一个 app 试试：
 
-```bash
-bash ~/.claude/skills/huashu-mac-use/scripts/probe.sh 系统设置
-```
+- macOS: `bash ~/.claude/skills/huashu-mac-use/scripts/probe.sh 系统设置`
+- Windows: `powershell -File $env:USERPROFILE\.claude\skills\huashu-mac-use\scripts\probe.ps1 系统设置`
 
-它会告诉你这个 app 的 bundle、架构、有没有 URL scheme、有没有 AppleScript 字典、有没有本地端口、AX 树里有几个可编辑控件、版本号。这是每次动手前的第 0 步。
+它会告诉你这个 app 的架构、有没有本地端口、可编辑控件数、版本号。这是每次动手前的第 0 步。
 
 ---
 
