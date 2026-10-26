@@ -144,7 +144,8 @@ func downsample(_ src: String, to dst: String, width: Int) -> (Int, Int)? {
     ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
     guard let out = ctx.makeImage(),
           let png = NSBitmapImageRep(cgImage: out).representation(using: .png, properties: [:]) else { return nil }
-    try? png.write(to: URL(fileURLWithPath: dst))
+    do { try png.write(to: URL(fileURLWithPath: dst)) }
+    catch { die("截图写不进 \(dst)：\(error.localizedDescription)", 1) }
     return (w, h)
 }
 
@@ -182,14 +183,23 @@ func diffReport(_ before: String, _ after: String, hitX: Double, hitY: Double) -
 
 // MARK: - 截图（自诊断）
 
+// screencapture 写不了文件（父目录不存在/目录只读）时退出码仍是 0，stderr 被吞，
+// 写失败会被下游 looksBlank 谎报成「后台不渲染」。落盘前先建目录，返回前验证文件真的在
+func ensureDir(for path: String) {
+    let dir = URL(fileURLWithPath: path).deletingLastPathComponent().path
+    guard !FileManager.default.fileExists(atPath: dir) else { return }
+    do { try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true) }
+    catch { die("目标目录建不出来 \(dir)：\(error.localizedDescription)", 1) }
+}
 @discardableResult
 func capture(_ id: Int, _ path: String) -> Bool {
+    ensureDir(for: path)
     let p = Process()
     p.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
     p.arguments = ["-x", "-o", "-l\(id)", path]   // -l 取窗口自己的合成缓冲区，不受遮挡
     let pipe = Pipe(); p.standardError = pipe; p.standardOutput = pipe
     try? p.run(); p.waitUntilExit()
-    return p.terminationStatus == 0
+    return p.terminationStatus == 0 && FileManager.default.fileExists(atPath: path)
 }
 // 同一 app 家族里同位置同尺寸的另一个窗口：多进程 app（内嵌 Chromium 的壳 + 渲染子进程）常有一对
 func siblings(of w: Win) -> [Win] {
@@ -648,6 +658,7 @@ case "see":
         target = w
     }
     let outPath = out ?? NSTemporaryDirectory() + "see-\(target.id).png"
+    ensureDir(for: outPath)
     let raw = NSTemporaryDirectory() + "see-raw-\(target.id).png"
     let (w, note) = shotSmart(target.id, raw)
     guard let (iw, ih) = downsample(raw, to: outPath, width: 1400) else { die("降采样失败") }
