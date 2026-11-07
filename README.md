@@ -21,9 +21,11 @@
 
 <sub>基于开放的 [Agent Skills 协议](https://agentskills.io)，Claude Code、Codex、Kimi Code、Cursor、OpenClaw、WorkBuddy、豆包工作、千问办公、ZCode 等任何能读 SKILL.md 的 runtime 都能装。</sub>
 
+<sub>v1.1 起，同桌面的控件操作交给 Vercel Labs 开源的 [agent-desktop](https://github.com/vercel-labs/agent-desktop) 执行，本 skill 负责选通道、跨桌面、不打扰和取证。[为什么这样分工 ↓](#和-agent-desktop-的关系)</sub>
+
 <br>
 
-[看效果](#看效果) · [安装](#安装) · [它怎么工作](#它怎么工作) · [和官方 computer use 的关系](#和官方-computer-use-的关系) · [自主进化](#自主进化每次收工回流一次)
+[看效果](#看效果) · [安装](#安装) · [它怎么工作](#它怎么工作) · [和 agent-desktop 的关系](#和-agent-desktop-的关系) · [和官方 computer use 的关系](#和官方-computer-use-的关系) · [自主进化](#自主进化每次收工回流一次)
 
 </div>
 
@@ -65,6 +67,7 @@
 - Xcode Command Line Tools（`xcode-select --install`），内核是一个 Swift 文件，首次用编译 20 秒
 - Node.js（内嵌 Chromium 的 app 走 CDP 时用）
 - 给**你正在用的终端 app**（Terminal / iTerm / Cursor / FanBox…）授「屏幕录制」和「辅助功能」。注意是授给终端 app，不是授给脚本，换个终端要重新授
+- 推荐装 [agent-desktop](https://github.com/vercel-labs/agent-desktop)：`npm install -g agent-desktop`。它用的是同一份终端授权，装完不用再授权；不装也能用，同桌面的控件操作会退回内核自己的 AX 和坐标路径，慢一些。`build.sh` 会告诉你装没装
 
 ### 方式一：把链接丢给 agent
 
@@ -108,7 +111,7 @@ macOS 上的 app 有四层可以下手，成本和可靠性是数量级差异，
 | 层 | 手段 | 什么时候用 |
 |---|---|---|
 | **L0 结构接口** | app 自己的 CLI、AppleScript 字典、URL scheme、本地端口（CDP / JSON-RPC） | **默认起点**。零焦点、跨桌面、多 agent 互不干扰 |
-| **L1 AX 语义树** | `mac ax` / `mac axset` | 探到可编辑控件、而且实写之后应用状态真的变了才算通 |
+| **L1 AX 语义树** | [agent-desktop](https://github.com/vercel-labs/agent-desktop) 的 ref 快照与无头操作；没装时退回 `mac ax` / `mac axset` | 同桌面原生控件的主力。点一下约 0.1 秒，不借焦点 |
 | **L2 窗口坐标** | `mac see` 看图 → `mac op` 点击输入 | 前两层不可用时的主力。截图上的像素坐标直接给它，内核自己换算，agent 永远不做乘法 |
 | **L3 像素** | `mac shot` | 控制手段的最后一档，**验证手段的每一步** |
 
@@ -131,15 +134,48 @@ macOS 上的 app 有四层可以下手，成本和可靠性是数量级差异，
 
 还有一条是很多人的默认拓扑：**agent 跑在全屏终端里，目标 app 在另一个桌面。** 这时 AX 查询会返回 0 个窗口，合成点击打给的是「当前桌面上那个位置的窗口」，不是无效，是打错对象。内核对跨桌面的坐标写操作直接拒绝（`refused: cross-space`，退出码 2），出路是 CDP 或请用户把窗口挪过来，不自己切桌面。
 
+所以动手第一步是**先分桌面，再分层**：`agent-desktop snapshot` 本身就是 0.4 秒的探测。能读到，就在同桌面按 ref 操作；报「窗口没有通过辅助功能暴露」，多半在别的桌面，Chromium 系走 CDP，只要取证走 `mac shot`，其余请用户把窗口挪过来。小建议：终端不全屏、和目标 app 待在同一个桌面（台前调度可以开），能无头操作的 app 会多很多。
+
 ### 3. 工具返回成功不等于生效
 
 判据阶梯从弱到强：工具返回 → 读回控件值 → 截图看见字 → **应用状态指示器**（发送键由灰变亮、placeholder 消失）→ **副作用**（任务进列表、文件落盘）。前三级都骗过人：AX `setValue` 把字画进了输入框，截图明明看得见，发送键仍是灰的，因为 React 自己维护的 state 不认这次输入，真点发送发出去是空消息。所以 `mac op` 和 `cdp.js mouse/insert` 动作后自动做差分，回 `effect=confirmed | partial | suspected_noop | unverifiable`。`suspected_noop` 不是失败，是「回去重看」。
 
 ---
 
+## 和 agent-desktop 的关系
+
+2026 年 10 月，Vercel Labs 发布了 [agent-desktop](https://github.com/vercel-labs/agent-desktop) 1.0：一个 Rust 写的 computer use CLI，读系统辅助功能树，给每个控件一个 ref，按 ref 做无头语义操作，Mac、Windows、Linux 都支持。我们装上它，和本 skill 的内核在同一台机器上做了一轮对照（完整记录在 [`references/agent-desktop协作.md`](references/agent-desktop协作.md)）：
+
+| 测试 | agent-desktop 1.2.0 | 本 skill v1.0 内核 |
+|---|---|---|
+| 读同桌面 Electron app 的控件 | 0.4 秒，136 个带 ref 的控件 | 只探到 1 个可编辑控件 |
+| 后台点计算器（窗口被台前调度收进侧边） | 每下约 0.1 秒，结果正确，不动前台 | 点不到 |
+| 往后台文本编辑器输入中英混排 | 0.09 秒，正确 | 0.55 秒，正确 |
+| 读别的桌面上的 app | 看不见窗口 | AX 同样看不见，但 CDP 能写、后台截图能截 |
+
+同桌面上它全面领先，所以 v1.1 起这一层直接交给它，我们不再维护自己的通用 AX 操作层。它看不见别的桌面（这是 macOS 辅助功能接口本身的限制），也没有「用户在不在场」的判断，`--headed` 物理输入时没有防抢焦点的闸。这几块继续由本 skill 承担：
+
+```
+huashu-mac-use（选通道 · 停手线 · 取证规范 · 中文 app 经验档案）
+├── agent-desktop   同桌面原生控件：snapshot → click / type / set-value → get 读回
+├── cdp.js          别的桌面上的 Chromium 系 app，零焦点
+├── mac shot        跨桌面窗口截图，取证
+└── mac op / idle   物理输入，带在场闸、遮挡闸、借焦点锁
+```
+
+「工具返回成功不等于生效」的读回规则，也借鉴了 agent-desktop 的交付语义：只有返回 `retry: safe` 才重试，其余先读现状再决定，避免点两次、发两遍。
+
+感谢 Vercel Labs 把它开源（Apache-2.0）。本仓库没有复制它的代码，只在运行时调用它的命令行。
+
+---
+
 ## 命令表
 
 ```
+agent-desktop snapshot --app <名> -i     同桌面控件树，每个控件带 ref（@快照id:eN）
+agent-desktop click | type | set-value | select @ref [值]    无头语义操作，不借焦点
+agent-desktop get @ref                   读回
+
 mac windows [关键词]             列窗口：id / pid / owner / 是否在当前桌面 / 尺寸
 mac see <id|owner>               一次拿到：降采样截图 + 窗口收据 + AX 元素表
 mac shot <id> <路径>             后台截窗口，失败自诊断（id 过期 / 锁屏 / 壳窗口→改截兄弟窗口 / 未渲染）
@@ -198,6 +234,7 @@ huashu-mac-use/
 │   └── cdp.js               # 内嵌 Chromium 的 CDP 工具：snapshot / find / wait / act
 ├── references/
 │   ├── 控制面详解.md         # 四层原理、三套坐标系、输入路径对比、postToPid 的四种失败
+│   ├── agent-desktop协作.md  # 和 agent-desktop 的分工、对照实测、内核已知问题
 │   ├── 权限与故障.md         # TCC 五种 service、错误码、跨桌面、四道闸的实现细节
 │   ├── app档案.md            # per-app 实测：豆包工作 / 千问办公 / WorkBuddy / 剪映 / 微信 / Blender…
 │   ├── 取证规范.md           # 命名、目录、合规、多模型跑批
@@ -225,6 +262,8 @@ huashu-mac-use/
 ## 许可证
 
 MIT — 随便用，随便改，随便造。
+
+同桌面的控件操作调用 [agent-desktop](https://github.com/vercel-labs/agent-desktop)（© Vercel，Apache-2.0）。它需要单独安装，不随本仓库分发。
 
 ---
 
@@ -254,6 +293,8 @@ Three ideas that make it different from pure-vision computer use:
 - **Reads never touch focus; writes default to zero focus.** Window-level background screenshots work even when covered. Writes post events straight to the target pid first, verify by pixel diff, and only then borrow focus, after passing four gates (frontmost check, occlusion check, "the user touched the keyboard in the last 2 s, wait up to 15 s", a machine-wide focus lock). A corner HUD tells the user the agent is acting, and is invisible to screen capture.
 - **A tool returning success is not evidence.** The verification ladder goes tool return → read-back → text visible → **app state indicator** (send button lights up) → **side effect** (task appears in list, file on disk). Every action reports `effect=confirmed | partial | suspected_noop | unverifiable`.
 
-**Install**: `npx skills add alchaincyf/huashu-mac-use`, then `bash scripts/build.sh` once (needs Xcode Command Line Tools). Grant Screen Recording and Accessibility to *the terminal app you run the agent in*.
+**Built on agent-desktop.** Since v1.1, same-desktop control of native widgets is delegated to Vercel Labs' [agent-desktop](https://github.com/vercel-labs/agent-desktop) (Apache-2.0): in a side-by-side test its accessibility-ref clicks took about 0.1 s each without touching focus, where our kernel needed about 6 s per click and had to borrow focus. This skill keeps what agent-desktop cannot do by design: windows on other Spaces (CDP for Chromium-based apps, background window capture for evidence), physical input guarded by presence/occlusion/focus-lock gates, and per-app experience notes. We also adopted its delivery semantics: retry only when an action reports `retry: safe`. No agent-desktop code is copied; it is invoked as a separate CLI.
+
+**Install**: `npx skills add alchaincyf/huashu-mac-use`, then `bash scripts/build.sh` once (needs Xcode Command Line Tools). Recommended: `npm install -g agent-desktop` (uses the same terminal permissions; optional, the skill falls back to its own kernel). Grant Screen Recording and Accessibility to *the terminal app you run the agent in*.
 
 Model-native computer use will probably overtake this in a few months. Until then, here is something that works today.
