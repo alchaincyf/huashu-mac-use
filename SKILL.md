@@ -5,7 +5,7 @@ metadata:
   author: "花叔"
   homepage: "https://github.com/alchaincyf"
   repository: "https://github.com/alchaincyf/huashu-mac-use"
-  version: "1.1.0"
+  version: "1.1.1"
 ---
 
 # huashu-mac-use · 操控没有 API 的原生 app
@@ -89,7 +89,6 @@ agent-desktop list-windows --app <名> / screenshot --app <名> <路径>
 mac windows [关键词] [--all]     列窗口：id / pid / owner / on(当前Space可见) / origin / 尺寸。默认隐藏系统残留窗口
 mac see <id|owner关键词> [--out]  一次拿到：降采样截图 + 收据 + AX 元素表（可用时 eN@json 直接点）
 mac shot <id> <路径>             后台截窗口。失败自诊断（id 过期 / 锁屏 / 壳窗口→自动改截兄弟窗口 / 未渲染），成功报尺寸与判空
-                                 ⚠️ 对部分 on=0 的小窗（屏外的「关于本机」、WorkBuddy 某些窗口）会挂死不返回，调用时套超时：perl -e 'alarm 30; exec @ARGV' mac shot …
 mac shotfg <id> <路径>           先试后台，确认空图才借焦点并立刻还（Chromium 系后台常不渲染）
 mac hud <毫秒> [文案] [corner|glow|plain]  屏幕四角脉冲取景框（借焦点时自动闪，一般不用手调）。MAC_HUD=0 关；
                                  默认对截图隐身，要录屏演示它本身用 MAC_HUD_CAPTURABLE=1

@@ -205,8 +205,10 @@ func chromiumFamily(pid: pid_t) -> Bool {
     let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/ps")
     p.arguments = ["-eo", "ppid=,comm="]
     let pipe = Pipe(); p.standardOutput = pipe; p.standardError = FileHandle.nullDevice
-    try? p.run(); p.waitUntilExit()
+    try? p.run()
+    // 先读后等：ps 全表输出超过 64KB 管道缓冲时，先 waitUntilExit 会和子进程互相等死
     let out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+    p.waitUntilExit()
     for line in out.split(separator: "\n") {
         let parts = line.split(separator: " ", maxSplits: 1)
         guard parts.count == 2, Int(parts[0].trimmingCharacters(in: .whitespaces)) == Int(pid) else { continue }
@@ -221,8 +223,9 @@ func liveCdpPort(pid: pid_t) -> String? {
     func sh(_ cmd: [String]) -> String {
         let p = Process(); p.executableURL = URL(fileURLWithPath: cmd[0]); p.arguments = Array(cmd.dropFirst())
         let pipe = Pipe(); p.standardOutput = pipe; p.standardError = FileHandle.nullDevice
-        try? p.run(); p.waitUntilExit()
-        return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        try? p.run()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()   // 先读后等，防管道写满死锁
+        return String(data: data, encoding: .utf8) ?? ""
     }
     let pids = sh(["/usr/bin/pgrep", "-P", "\(pid)"]).split(separator: "\n").map(String.init) + ["\(pid)"]
     let allPids = (pids + sh(["/usr/bin/pgrep", "-P", pids.joined(separator: ",")]).split(separator: "\n").map(String.init))
@@ -647,7 +650,8 @@ case "see":
         else { die("没有 owner 含「\(rest[0])」的窗口 → mac windows 看看") }
         target = w
     }
-    let outPath = out ?? NSTemporaryDirectory() + "see-\(target.id).png"
+    var outPath = out ?? NSTemporaryDirectory() + "see-\(target.id).png"
+    if !outPath.lowercased().hasSuffix(".png") { outPath += ".png" }  // 不补扩展名的话下游 Read/sips 认不出这是图
     let raw = NSTemporaryDirectory() + "see-raw-\(target.id).png"
     let (w, note) = shotSmart(target.id, raw)
     guard let (iw, ih) = downsample(raw, to: outPath, width: 1400) else { die("降采样失败") }
@@ -697,10 +701,12 @@ case "see":
     }
 
 case "clickin", "hoverin":
-    guard rest.count >= 3, let id = Int(rest[0]) else { die("用法: mac \(args[1]) <windowid> <x> <y> [@图] [--dry]") }
+    // eN@see.json 形式只带一个坐标参数，别再要求凑满 x y
+    let refForm = rest.count >= 2 && rest[1].hasPrefix("e") && rest[1].contains("@")
+    guard rest.count >= (refForm ? 2 : 3), let id = Int(rest[0]) else { die("用法: mac \(args[1]) <windowid> <x> <y> [@图] | mac \(args[1]) <windowid> eN@see.json  [--dry]") }
     let ref = extractRef(&rest)
     guard let w = winInfo(id) else { die("窗口 \(id) 不存在（可能已关闭或 id 过期）") }
-    let c = resolve(rest[1], rest[2], ww: w.w, wh: w.h, ref: ref)
+    let c = resolve(rest[1], rest.count > 2 ? rest[2] : "0", ww: w.w, wh: w.h, ref: ref)
     var edge = ""
     if c.pt.x < 8 && c.pt.y < 8 { edge = "  ⚠️ 落点贴着窗口左上角，大概率坐标算错" }
     if dry {
@@ -870,18 +876,20 @@ case "axset":
     print("setValue err=\(r.rawValue) 读回=\"\(rb.prefix(40))\"\n→ err 和读回都不是判据。截图看发送键有没有由灰变亮；没变就是 app 不认这次输入，改 mac op 或 CDP")
 
 case "op":
-    guard rest.count >= 4, let wid = Int(rest[0]) else { die("用法: mac op <windowid> <x> <y> <文本> [@图] [send <sx> <sy>] [shot <路径>] [--bg|--fast] [--force] [--dry]") }
+    // 同 clickin：eN@see.json 形式少一个坐标参数，文本和后续选项整体前移一位
+    let opRefForm = rest.count >= 2 && rest[1].hasPrefix("e") && rest[1].contains("@")
+    guard rest.count >= (opRefForm ? 3 : 4), let wid = Int(rest[0]) else { die("用法: mac op <windowid> <x> <y> <文本> [@图] | mac op <windowid> eN@see.json <文本>  [send <sx> <sy>] [shot <路径>] [--bg|--fast] [--force] [--dry]") }
     let ref = extractRef(&rest)
-    let text = rest[3]
+    let text = opRefForm ? rest[2] : rest[3]
     var sendXY: (String, String)?, shotPath: String?
-    var i = 4
+    var i = opRefForm ? 3 : 4
     while i < rest.count {
         if rest[i] == "send", i + 2 < rest.count { sendXY = (rest[i + 1], rest[i + 2]); i += 3 }
         else if rest[i] == "shot", i + 1 < rest.count { shotPath = rest[i + 1]; i += 2 }
         else { i += 1 }
     }
     guard let w = winInfo(wid) else { die("窗口 \(wid) 不存在。先 mac windows 重取 id") }
-    let c = resolve(rest[1], rest[2], ww: w.w, wh: w.h, ref: ref)
+    let c = resolve(rest[1], rest.count > 2 ? rest[2] : "0", ww: w.w, wh: w.h, ref: ref)
     let sc = sendXY.map { resolve($0.0, $0.1, ww: w.w, wh: w.h, ref: ref) }
     let plan = fastMode ? "--fast 直接借焦点" : (bgOnly ? "--bg 只走后台档，不升级" : "默认阶梯：先后台档，未生效才升级借焦点")
     if dry {
@@ -1043,8 +1051,9 @@ case "open":
     func sh(_ cmd: [String]) -> String {
         let p = Process(); p.executableURL = URL(fileURLWithPath: cmd[0]); p.arguments = Array(cmd.dropFirst())
         let pipe = Pipe(); p.standardOutput = pipe; p.standardError = FileHandle.nullDevice
-        try? p.run(); p.waitUntilExit()
-        return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        try? p.run()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()   // 先读后等，防管道写满死锁
+        return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
     var path = ""
     let fm = FileManager.default
