@@ -23,7 +23,7 @@ let USAGE = """
   mac hover <x> <y> [holdms]
   mac scroll <x> <y> <dy> [dx] [steps]    真实滚轮（画布类应用）
   mac type <pid> <文本> [global]          投递 Unicode（中文可用）
-  mac key <pid> <keycode> [cmd]           36=回车 53=Esc 51=删除 9=v（走全局流）
+  mac key <pid> <keycode> [cmd|ctrl|shift|opt]  可用+组合；36=回车 53=Esc 51=删除 9=v（走全局流）
   mac ax <pid>                            AX 探测（内部查两次取最大）
   mac axset <pid> <文本>                  给第一个可编辑控件设值并读回
   mac op <windowid> <x> <y> <文本> [@图] [send <sx> <sy>] [shot <路径>] [--bg|--fast] [--force] [--dry]
@@ -826,8 +826,19 @@ case "type":
     print("typed \(rest[1].count) chars -> pid \(pid) \(global ? "global" : "postToPid")（返回值不代表生效，必须回读）")
 
 case "key":
-    guard rest.count >= 2, let pid = pid_t(rest[0]), let code = UInt16(rest[1]) else { die("用法: mac key <pid> <keycode> [cmd]") }
-    let flags: CGEventFlags = rest.count > 2 && rest[2] == "cmd" ? .maskCommand : []
+    guard rest.count >= 2, let pid = pid_t(rest[0]), let code = UInt16(rest[1]) else { die("用法: mac key <pid> <keycode> [cmd|ctrl|shift|opt，可用+组合如 cmd+shift]") }
+    // 修饰键：认不出的词直接报错。以前只认 cmd，写 ctrl 会被静默丢掉、发出裸键（issue #2）
+    let modMap: [String: (CGEventFlags, String)] = ["cmd": (.maskCommand, "cmd"), "command": (.maskCommand, "cmd"),
+        "ctrl": (.maskControl, "ctrl"), "control": (.maskControl, "ctrl"), "shift": (.maskShift, "shift"),
+        "opt": (.maskAlternate, "opt"), "option": (.maskAlternate, "opt"), "alt": (.maskAlternate, "opt")]
+    var flags: CGEventFlags = [], modNames: [String] = []
+    if rest.count > 2 {
+        for tok in rest[2].lowercased().split(separator: "+").map(String.init) {
+            guard let (f, name) = modMap[tok] else { die("不认识的修饰键「\(tok)」：只支持 cmd / ctrl / shift / opt，组合写成 cmd+shift", 1) }
+            if !flags.contains(f) { flags.insert(f); modNames.append(name) }
+        }
+    }
+    let modSuffix = modNames.map { "+" + $0 }.joined()
     // 这一下走全局流，落在「当前前台 app」身上（pid 参数只用于回显），所以闸看的是前台是谁
     let frontApp = NSWorkspace.shared.frontmostApplication
     let frontName = frontApp?.localizedName ?? "?"
@@ -835,7 +846,7 @@ case "key":
     // 前台随时会被用户切走，不查这一下就会按到他正在用的窗口上——实测踩过。
     if dry {
         let fp = frontApp?.processIdentifier ?? -1
-        print("dry: key \(code)\(flags.contains(.maskCommand) ? "+cmd" : "") 会落在前台「\(frontName)」(pid \(fp))")
+        print("dry: key \(code)\(modSuffix) 会落在前台「\(frontName)」(pid \(fp))")
         print("  闸预检: frontmost=" + (fp == pid ? "pass(前台就是目标)" : "BLOCK(目标 pid \(pid) 不在前台)")
               + "  回车=" + (code == 36 && shellOwners.contains(frontName) ? "BLOCK(\(frontName) 是终端/IDE 类)" : "pass")
               + "  " + presencePreview())
@@ -854,7 +865,7 @@ case "key":
         guard let e = CGEvent(keyboardEventSource: src, virtualKey: code, keyDown: down) else { continue }
         e.flags = flags; e.post(tap: .cghidEventTap); markSynthetic(); usleep(30_000)
     }
-    print("key \(code)\(flags.contains(.maskCommand) ? "+cmd" : "") -> 前台 app（pid \(pid) 仅回显）")
+    print("key \(code)\(modSuffix) -> 前台 app（pid \(pid) 仅回显）")
 
 case "ax":
     guard rest.count >= 1, let pid = pid_t(rest[0]) else { die("用法: mac ax <pid>") }

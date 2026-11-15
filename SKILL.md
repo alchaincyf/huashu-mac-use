@@ -98,7 +98,7 @@ mac op <id> <x> <y> <文本> [@图] [send <sx> <sy>] [shot <路径>]   写操作
 mac clickin <id> <x> <y> [@图] / hoverin ... [holdms]           不激活的点击/真实悬停（组件库菜单要真实悬停）。走全局事件流，同样过遮挡闸和在场闸
 mac open <显示名|路径> [--cdp 端口] [--relaunch]   中文显示名解析成绝对路径启动；--cdp 带调试端口并等到通
 mac ax <pid> / mac axset <pid> <文本>                AX 探测（内部查两次）/ 设值
-mac type <pid> <文本> [global] / mac key <pid> <码> [cmd] / mac scroll / mac click / mac frontmost
+mac type <pid> <文本> [global] / mac key <pid> <码> [cmd|ctrl|shift|opt，可+组合] / mac scroll / mac click / mac frontmost
                                  ⚠️ 这几个走全局流的打给「当前前台窗口」，不是打给你写的 pid。内核已加 frontmost 闸
                                  （前台不是目标就拒绝），但仍请先 --dry。不带 global 的 type 走 postToPid 直投进程，不碰前台，无闸
 probe.sh <app名>                                    第 0 步：bundle、架构、URL scheme、真实 sdef、本地端口、AX 控件数、版本
