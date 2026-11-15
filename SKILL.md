@@ -5,7 +5,7 @@ metadata:
   author: "花叔"
   homepage: "https://github.com/alchaincyf"
   repository: "https://github.com/alchaincyf/huashu-mac-use"
-  version: "1.1.1"
+  version: "1.1.2"
 ---
 
 # huashu-mac-use · 操控没有 API 的原生 app
