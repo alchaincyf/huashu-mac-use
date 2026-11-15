@@ -68,6 +68,39 @@ echo "显示名: ${DISP:-未知}       # 用户说的名字 / CGWindow 的 owner
 echo "bundle: $BID"
 echo "可执行名: $EXE       # System Events 用这个；三个名字可能互不相同，别混用"
 echo "版本: ${VER:-未知}       # 🔴 核对档案第一步。版本变了，档案里的坐标一律作废、行为层重测"
+# 自动比对档案：app档案.md 里同 bundle 的 yaml 块，`版本:`（或 `verified_on:`）就是该条实测时的版本。
+# 档案写的是旧版本时，旧结论最容易被当真用掉（issue #2：微信 v3 的「mac click 可用」到 v4 已作废）。
+ARCHIVE="$DIR/../references/app档案.md"
+if [ -n "$BID" ] && [ -f "$ARCHIVE" ]; then
+  python3 - "$ARCHIVE" "$BID" "${VER:-}" <<'PYEOF'
+import re, sys
+path, bid, ver = sys.argv[1], sys.argv[2], sys.argv[3]
+lines = open(path, encoding="utf-8").read().splitlines()
+found = []
+for i, l in enumerate(lines):
+    if l.strip() != f"bundle: {bid}":
+        continue
+    for m in lines[i + 1:i + 40]:
+        if m.startswith("```"):
+            break
+        mm = re.match(r"(?:版本|verified_on):\s*(.*)", m)
+        if mm:
+            v = re.match(r"[0-9][0-9A-Za-z.\-]*", mm.group(1).strip())
+            found.append(v.group(0) if v else None)
+            break
+    else:
+        found.append(None)
+if not found:
+    print("档案: 无此 app 的条目 → 实测后按 app档案.md 的 yaml 骨架补一条（写上 版本:）")
+elif ver and ver in found:
+    print(f"档案: 版本一致（{ver}），档案结论仍需按「点中才算有效」核对")
+elif all(v is None for v in found):
+    print("⚠️ 档案: 该条没记版本 → 行为层结论按未核对处理，实测后补上 版本:")
+else:
+    old = " / ".join(v for v in found if v)
+    print(f"⚠️ 档案基于 {old}，当前是 {ver or '未知'} → 坐标作废，行为层结论（AX/端口/点击方式/回车语义）需重测")
+PYEOF
+fi
 
 # 🔴 同一个 bundle id 装了多份：静默的坑，症状是「探的是 A、跑的是 B、坐标全对不上」且不报错。
 # 实测剪映就有两份（11.2.13042 与 11.2.0，bundle id 都是 com.lemon.lvpro），

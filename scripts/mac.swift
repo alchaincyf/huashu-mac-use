@@ -49,6 +49,16 @@ struct Win {
     let title: String, layer: Int, onscreen: Bool?
     var bounds: CGRect { CGRect(x: x, y: y, width: w, height: h) }
 }
+// 遮挡闸报错时分辨「残留浮层」和「用户真在用的窗口」（issue #2）：无标题且铺满整屏或几乎没有面积的上层窗口，
+// 多半是别的自动化工具（如 computer use 的 Cua Driver）、显示器 OSD 留下的透明罩子，不是用户在用的 app
+func overlayHint(_ top: Win) -> String {
+    let screens = NSScreen.screens.map { $0.frame.size }
+    let fullScreen = screens.contains { top.w >= $0.width * 0.9 && top.h >= $0.height * 0.9 }   // 罩住九成以上屏幕
+    guard top.title.isEmpty, fullScreen || top.w * top.h < 4 else { return "" }
+    return "\n提示：上层窗口无标题、\(fullScreen ? "铺满整屏" : "几乎没有面积")，可能是别的工具或系统浮层留下的透明窗口，不是用户在用的 app。"
+        + "\n  确认：mac windows --all | grep \"\(top.owner)\"   ps -o pid,comm= -p \(top.pid)"
+        + "\n  确是残留（比如已退出的自动化工具）再请用户结束 pid \(top.pid)；拿不准就别动，按上面的路线绕开"
+}
 // 必须用 .optionAll：.optionOnScreenOnly 会让被遮挡的窗口整个消失
 func allWindows() -> [Win] {
     let raw = (CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]) ?? []
@@ -740,7 +750,7 @@ case "clickin", "hoverin":
     guardOnScreen(p, "多半是 activate 后窗口仍在动画。等 1 秒重跑")
     // 遮挡闸：这一下打给「落点最上层那个窗口」。目标被压住时会静默戳在用户正在用的窗口上
     if !force, let top = topWindowAt(p), top.id != id {
-        die("refused: occluded 落点 (\(Int(p.x)),\(Int(p.y))) 上层是「\(top.owner)」的窗口 \(top.id)，点下去会戳到它而不是目标 \(w.owner)。\n用 mac op（会激活目标）、CDP，或请用户把目标窗口移到最前；确认要点加 --force", 2)
+        die("refused: occluded 落点 (\(Int(p.x)),\(Int(p.y))) 上层是「\(top.owner)」的窗口 \(top.id)，点下去会戳到它而不是目标 \(w.owner)。\n用 mac op（会激活目标）、CDP，或请用户把目标窗口移到最前；确认要点加 --force" + overlayHint(top), 2)
     }
     // 在场闸：clickin 不激活，但走全局事件流，跟用户共用同一个鼠标指针
     gateUserPresence("clickin 走全局事件流，跟他共用同一个鼠标指针。", alt: "改走 CDP 或 mac op --bg")
@@ -778,7 +788,7 @@ case "click", "hover":
         exit(0)
     }
     if isClick, !bg, !force, let top = topWindowAt(c.pt), top.pid != pid {
-        die("refused: occluded 落点 (\(Int(c.pt.x)),\(Int(c.pt.y))) 上层是「\(top.owner)」(pid \(top.pid))，不是目标 pid \(pid)。点下去会戳到它。\n改 mac clickin（按窗口定位）或 CDP；确认要点加 --force", 2)
+        die("refused: occluded 落点 (\(Int(c.pt.x)),\(Int(c.pt.y))) 上层是「\(top.owner)」(pid \(top.pid))，不是目标 pid \(pid)。点下去会戳到它。\n改 mac clickin（按窗口定位）或 CDP；确认要点加 --force" + overlayHint(top), 2)
     }
     if !bg { gateUserPresence("全局坐标点击/悬停跟用户共用同一个鼠标指针。", alt: "改 mac clickin（按窗口定位）或 CDP") }
     if isClick {
